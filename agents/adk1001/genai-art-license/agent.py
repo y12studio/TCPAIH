@@ -14,7 +14,10 @@ def get_taichung_pubarts_list() -> dict:
     """Retrieves the current list of public artworks in Taichung.
 
     Returns:
-        dict: status and result or error msg.
+        dict: A dictionary containing the taichung public arts list information.
+              Includes a 'status' key ('success' or 'error').
+              If 'success', includes a 'output' key with Taichung public arts list details.
+              If 'error', includes an 'message' key.
     """
     # read the list from script_dir/taichung_pubarts_list.txt
     file_path = os.path.join(script_dir, 'taichung_pubarts_list.txt')

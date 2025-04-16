@@ -2,13 +2,24 @@ import datetime
 import os
 import sys
 from zoneinfo import ZoneInfo
-from google.adk.agents import Agent
+from google.adk.agents import LlmAgent
+from google.adk.tools import agent_tool
+from pathlib import Path
+import logging
 
-# Debug: Print current working directory and script location
-# print(f"Current working directory: {os.getcwd()}")
-# print(f"Script location: {os.path.dirname(os.path.abspath(__file__))}")
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = Path(__file__).resolve().parent
+
+def read_file_content(file_path: Path) -> str:
+    """Reads the content of a file and returns it as a string."""
+    try:
+        return file_path.read_text(encoding='utf-8')
+    except Exception as e:
+        logger.error(f"Failed to read file {file_path}: {e}")
+        raise
 
 
 def retrieve_agent_details(markdown_content: str) -> dict:
@@ -20,7 +31,7 @@ def retrieve_agent_details(markdown_content: str) -> dict:
     Returns:
         dict: A dictionary containing the agent instruction information.
               Includes a 'status' key ('success' or 'error').
-              If 'success', includes 'name', 'description' and 'instruction' keys.
+              If 'success', includes 'description' and 'instruction' keys.
               If 'error', includes a 'message' key.
     """
     try:
@@ -37,17 +48,6 @@ def retrieve_agent_details(markdown_content: str) -> dict:
                     "message": f"Missing required section: '{keyword}'"
                 }
 
-        # Validate and extract agent name from the first line
-        first_line = lines[0].strip()
-        if not first_line.startswith('# ') or ' 的 AI Agent 任務說明書' not in first_line:
-            return {
-                "status": "error",
-                "message": "First line must follow format: '# [Agent Name] 的 AI Agent 任務說明書'"
-            }
-
-        agent_name = first_line.replace(
-            '# ', '').replace(' 的 AI Agent 任務說明書', '')
-
         # Find description section
         description_start = lines.index("# 任務描述") + 1
         description_end = lines.index("# 任務指令")
@@ -60,7 +60,6 @@ def retrieve_agent_details(markdown_content: str) -> dict:
 
         return {
             "status": "success",
-            "name": agent_name,
             "description": description,
             "instruction": instruction
         }
@@ -80,84 +79,75 @@ def get_taichung_pubarts_list() -> dict:
               If 'success', includes a 'output' key with Taichung public arts list details.
               If 'error', includes an 'message' key.
     """
-    # read the list from script_dir/taichung_pubarts_list.txt
-    file_path = os.path.join(script_dir, 'taichung_pubarts_list.txt')
-    if not os.path.exists(file_path):
+    file_path = script_dir / 'taichung_pubarts_list.txt'
+    if not file_path.exists():
+        logger.error(f"File not found: {file_path}")
         return {
             "status": "error",
             "message": f"File not found: {file_path}",
         }
-    with open(file_path, 'r', encoding='utf-8') as file:
-        pubarts_list = file.read()
-    return {
-        "status": "success",
-        "output": pubarts_list,
-    }
+    try:
+        pubarts_list = read_file_content(file_path)
+        return {
+            "status": "success",
+            "output": pubarts_list,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error reading file: {e}",
+        }
 
 
-def say_hello(name: str = "there") -> str:
-    """Provides a simple greeting, optionally addressing the user by name.
-
+def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.0-flash-001", tools: list = None):
+    """Loads an agent from a markdown file and creates an Agent object.
+    
     Args:
-        name (str, optional): The name of the person to greet. Defaults to "there".
-
+        agent_id (str): The identifier for the agent, used for both the filename and agent name.
+        model (str, optional): The model to use for the agent. Defaults to "gemini-2.0-flash-001".
+        tools (list, optional): List of tools available to the agent. Defaults to None.
+    
     Returns:
-        str: A friendly greeting message.
+        Agent or None: The created Agent object, or None if an error occurred.
+        
+    Raises:
+        ValueError: If agent creation fails.
     """
-    print(f"--- Tool: say_hello called with name: {name} ---")
-    return f"Hello, {name}!"
-
+    try:
+        md_file_path = script_dir / f"{agent_id}.md"
+        agent_md_content = read_file_content(md_file_path)
+        agent_details = retrieve_agent_details(agent_md_content)
+        if agent_details["status"] != "success":
+            raise ValueError(f"Error retrieving agent details: {agent_details['message']}")
+        agent = LlmAgent(
+            name=agent_id,
+            model=model,
+            description=agent_details["description"],
+            instruction=agent_details["instruction"],
+            tools=tools or []
+        )
+        logger.info(f"✅ Agent '{agent.name}' created using model '{model}'.")
+        return agent
+    except Exception as e:
+        error_msg = f"❌ Could not create {agent_id} agent. Error: {e}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
 # --- Greeting Agent ---
-greeting_agent = None
-try:
-    with open(os.path.join(script_dir, 'agent-greeting.md'), 'r', encoding='utf-8') as file:
-        agent_greeting_md = file.read()
-    # extract the instruction from the markdown
-    agent_greeting_detail = retrieve_agent_details(agent_greeting_md)
-    greeting_agent = Agent(
-        model="gemini-2.0-flash",
-        name=agent_greeting_detail['name'],
-        instruction=agent_greeting_detail['instruction'],
-        # Crucial for delegation
-        description=agent_greeting_detail['description'],
-        tools=[say_hello, get_taichung_pubarts_list],
-    )
-    print(
-        f"✅ Agent '{greeting_agent.name}' created using model 'gemini-2.0-flash'.")
-except Exception as e:
-    print(
-        f"❌ Could not create Greeting agent. Check API Key (gemini-2.0-flash). Error: {e}")
+greeting_agent = load_agent_from_markdown(
+    agent_id="agent_greeting",
+    tools=[]
+)
 
-with open(os.path.join(script_dir, 'agent-license.md'), 'r', encoding='utf-8') as file:
-    agent_license_md = file.read()
-# extract the instruction from the markdown
-agent_license_details = retrieve_agent_details(agent_license_md)
-
-genai_art_license_agent = Agent(
-    name=agent_license_details["name"],
-    model="gemini-2.0-flash",
-    description=agent_license_details["description"],
-    instruction=agent_license_details["instruction"],
+# --- License Agent ---
+genai_art_license_agent = load_agent_from_markdown(
+    agent_id="agent_license",
     tools=[get_taichung_pubarts_list]
 )
 
-# read the instruction from script_dir/agent-root.md
-with open(os.path.join(script_dir, 'agent-root.md'), 'r', encoding='utf-8') as file:
-    agent_root_md = file.read()
-# extract the instruction from the markdown
-agent_root_details = retrieve_agent_details(agent_root_md)
-
-# Debug agent_root_details
-print(f"Agent Root Details: {agent_root_details}")
-if agent_root_details["status"] != "success":
-    raise ValueError(
-        f"Error retrieving agent details: {agent_root_details['message']}")
-
-root_agent = Agent(
-    name=agent_root_details["name"],
-    model="gemini-2.0-flash",
-    description=agent_root_details["description"],
-    instruction=agent_root_details["instruction"],
-    sub_agents=[greeting_agent, genai_art_license_agent]
+# --- Root Agent ---
+root_agent = load_agent_from_markdown(
+    agent_id="agent_root"
 )
+
+root_agent.sub_agents = [greeting_agent, genai_art_license_agent]

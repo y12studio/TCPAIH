@@ -70,35 +70,6 @@ def retrieve_agent_details(markdown_content: str) -> dict:
         }
 
 
-def get_taichung_pubarts_list() -> dict:
-    """Retrieves the current list of public artworks in Taichung.
-
-    Returns:
-        dict: A dictionary containing the taichung public arts list information.
-              Includes a 'status' key ('success' or 'error').
-              If 'success', includes a 'output' key with Taichung public arts list details.
-              If 'error', includes an 'message' key.
-    """
-    file_path = script_dir / 'taichung_pubarts_list.txt'
-    if not file_path.exists():
-        logger.error(f"File not found: {file_path}")
-        return {
-            "status": "error",
-            "message": f"File not found: {file_path}",
-        }
-    try:
-        pubarts_list = read_file_content(file_path)
-        return {
-            "status": "success",
-            "output": pubarts_list,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error reading file: {e}",
-        }
-
-
 def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-preview-04-17", tools: list = None):
     """Loads an agent from a markdown file and creates an Agent object.
     
@@ -133,16 +104,10 @@ def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-previ
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-# --- Greeting Agent ---
-greeting_agent = load_agent_from_markdown(
-    agent_id="agent_greeting",
+# --- Agent Reviewer ---
+agent_reviewer = load_agent_from_markdown(
+    agent_id="agent_reviewer",
     tools=[]
-)
-
-# --- License Agent ---
-genai_art_license_agent = load_agent_from_markdown(
-    agent_id="agent_license",
-    tools=[get_taichung_pubarts_list]
 )
 
 # --- Root Agent ---
@@ -150,4 +115,4 @@ root_agent = load_agent_from_markdown(
     agent_id="agent_root"
 )
 
-root_agent.sub_agents = [greeting_agent, genai_art_license_agent]
+root_agent.sub_agents = [agent_reviewer]

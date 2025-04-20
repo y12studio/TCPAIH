@@ -9,20 +9,6 @@ This directory contains sample agents built with Google's Agent Development Kit 
 - API key from Google AI Studio or Vertex AI
 - Environment configuration
 
-## Included Agents
-
-1. **Root Agent** (`agent_root`)
-   - Orchestrates sub-agents and routes user queries.
-   - Delegates to the Greeting or License agent as appropriate.
-
-2. **Greeting Agent** (`agent_greeting`)
-   - Handles greetings and introductory interactions.
-
-3. **GenAI Art License Agent** (`agent_license`)
-   - Answers questions about copyright and licensing for AI-generated art.
-   - Provides comprehensive disclaimers and guidance for public art usage.
-   - Uses the `get_taichung_pubarts_list` tool to provide a list of public artworks in Taichung.
-
 ## Setup Instructions
 
 1. Create a `.env` file in each agent directory (see `.env.example` for a template).

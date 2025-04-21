@@ -199,16 +199,17 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  api_server  Start a FastAPI server for agents.
-  deploy      Deploy Agent.
+  api_server  Starts a FastAPI server for agents.
+  create      Creates a new app in the current folder with prepopulated agent template.
+  deploy      Deploys agent to hosted environments.
   eval        Evaluates an agent given the eval sets.
-  run         Run an interactive CLI for a certain agent.
-  web         Start a FastAPI server with Web UI for agents.
+  run         Runs an interactive CLI for a certain agent.
+  web         Starts a FastAPI server with Web UI for agents.
 
 $ uv run adk web --help
 Usage: adk web [OPTIONS] [AGENTS_DIR]
 
-  Start a FastAPI server with Web UI for agents.
+  Starts a FastAPI server with Web UI for agents.
 
   AGENTS_DIR: The directory of agents, where each sub-directory is a single agent, containing at least `__init__.py` and `agent.py` files.
 
@@ -230,7 +231,7 @@ Options:
                                   Optional. Set the logging level
   --log_to_tmp                    Optional. Whether to log to system temp folder instead of console. This is useful for local debugging.
   --trace_to_cloud                Optional. Whether to enable cloud trace for telemetry.
-  --help
+  --help                          Show this message and exit.
 
 $ uv run adk eval --help
 Usage: adk eval [OPTIONS] AGENT_MODULE_FILE_PATH [EVAL_SET_FILE_PATH]...
@@ -258,5 +259,11 @@ Usage: adk eval [OPTIONS] AGENT_MODULE_FILE_PATH [EVAL_SET_FILE_PATH]...
 Options:
   --config_file_path TEXT   Optional. The path to config file.
   --print_detailed_results  Optional. Whether to print detailed results on console or not.
-  --help                    Show this message and exit.                          Show this message and exit.  
+  --help                    Show this message and exit.
 ```
+
+
+## 指令 4 - 完成任務後的摘要講解與提示。
+
+1. 簡單說明這次測試的工具與環境要求，並強調這些要求的重要性。
+2. 完成任務後，提示可轉到其他代理程式對話。

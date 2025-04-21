@@ -3,9 +3,13 @@ import os
 import sys
 from zoneinfo import ZoneInfo
 from google.adk.agents import LlmAgent
-from google.adk.tools import agent_tool
+from google.adk.tools.agent_tool import AgentTool
+from google.adk.tools.transfer_to_agent_tool import transfer_to_agent
 from pathlib import Path
 import logging
+
+# MODEL="gemini-2.5-flash-preview-04-17"
+MODEL="gemini-2.0-flash"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -70,7 +74,7 @@ def retrieve_agent_details(markdown_content: str) -> dict:
         }
 
 
-def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-preview-04-17", tools: list = None):
+def load_agent_from_markdown(agent_id: str, model: str = MODEL, tools: list = None):
     """Loads an agent from a markdown file and creates an Agent object.
     
     Args:
@@ -104,15 +108,61 @@ def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-previ
         logger.error(error_msg)
         raise ValueError(error_msg)
 
+def get_current_time(city: str) -> dict:
+    """Returns the current time in a specified city.
+
+    Args:
+        city (str): The name of the city for which to retrieve the current time.
+
+    Returns:
+        dict: status and result or error msg.
+    """
+
+    if city.lower() == "taichung":
+        tz_identifier = "Asia/Taipei"
+    else:
+        return {
+            "status": "error",
+            "error_message": (
+                f"Sorry, I don't have timezone information for {city}."
+            ),
+        }
+
+    tz = ZoneInfo(tz_identifier)
+    now = datetime.datetime.now(tz)
+    report = (
+        f'The current time in {city} is {now.strftime("%Y-%m-%d %H:%M:%S %Z%z")}'
+    )
+    return {"status": "success", "report": report}
+
+
+time_agent = LlmAgent(
+    name="time_agent",
+    model=MODEL,
+    description=(
+        "回答城市時間問題的代理程式。"
+    ),
+    instruction=(
+        "我可以回答您有關城市時間的問題。"
+    ),
+    tools=[get_current_time],
+)
+
 # --- Agent Reviewer ---
 agent_reviewer = load_agent_from_markdown(
     agent_id="agent_reviewer",
     tools=[]
 )
 
-# --- Root Agent ---
-root_agent = load_agent_from_markdown(
-    agent_id="agent_root"
+agent_security = load_agent_from_markdown(
+    agent_id="agent_security",
+    tools=[]
 )
 
-root_agent.sub_agents = [agent_reviewer]
+root_agent = LlmAgent(
+    name="human_resource_info_coordinator",
+    model=MODEL,
+    instruction="將使用者請求導引到適合的人工智慧代理程式：使用 time_agent 回答時間問題，使用 agent_reviewer 回答專案測試時工具與學經歷審核問題，使用 agent_security 回答專案測試時資訊安全（資安）問題。",
+    description="專案人力資源資訊的服務台。",
+    sub_agents=[time_agent, agent_reviewer, agent_security]
+)

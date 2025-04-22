@@ -7,6 +7,10 @@ from google.adk.tools import agent_tool
 from pathlib import Path
 import logging
 
+# MODEL="gemini-2.5-flash-preview-04-17"
+MODEL="gemini-2.0-flash"
+
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -99,7 +103,7 @@ def get_taichung_pubarts_list() -> dict:
         }
 
 
-def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-preview-04-17", tools: list = None):
+def load_agent_from_markdown(agent_id: str, model: str = MODEL, tools: list = None):
     """Loads an agent from a markdown file and creates an Agent object.
     
     Args:
@@ -133,21 +137,77 @@ def load_agent_from_markdown(agent_id: str, model: str = "gemini-2.5-flash-previ
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-# --- Greeting Agent ---
-greeting_agent = load_agent_from_markdown(
-    agent_id="agent_greeting",
-    tools=[]
+def get_current_time(city: str) -> dict:
+    """Returns the current time in a specified city.
+
+    Args:
+        city (str): The name of the city for which to retrieve the current time.
+
+    Returns:
+        dict: status and result or error msg.
+    """
+
+    if city.lower() == "taichung":
+        tz_identifier = "Asia/Taipei"
+    else:
+        return {
+            "status": "error",
+            "error_message": (
+                f"Sorry, I don't have timezone information for {city}."
+            ),
+        }
+
+    tz = ZoneInfo(tz_identifier)
+    now = datetime.datetime.now(tz)
+    report = (
+        f'The current time in {city} is {now.strftime("%Y-%m-%d %H:%M:%S %Z%z")}'
+    )
+    return {"status": "success", "report": report}
+
+
+agent_time = LlmAgent(
+    name="time_agent",
+    model=MODEL,
+    description=(
+        "回答城市時間問題的代理程式。"
+    ),
+    instruction=(
+        "我可以回答您有關城市時間的問題。"
+    ),
+    tools=[get_current_time],
 )
 
 # --- License Agent ---
-genai_art_license_agent = load_agent_from_markdown(
+agent_genai_art_license = load_agent_from_markdown(
     agent_id="agent_license",
     tools=[get_taichung_pubarts_list]
 )
 
-# --- Root Agent ---
-root_agent = load_agent_from_markdown(
-    agent_id="agent_root"
+# --- Agent Reviewer ---
+agent_reviewer = load_agent_from_markdown(
+    agent_id="agent_reviewer",
+    tools=[]
 )
 
-root_agent.sub_agents = [greeting_agent, genai_art_license_agent]
+agent_security = load_agent_from_markdown(
+    agent_id="agent_security",
+    tools=[]
+)
+
+
+root_agent = LlmAgent(
+    name="human_resource_info_coordinator",
+    model=MODEL,
+    instruction="""將使用者請求導引到適合的人工智慧代理程式：
+- 使用 agent_time 回答時間問題
+- 使用 agent_genai_art_license 回答公共藝術品生成式藝術的著作權相關問題
+- 使用 agent_reviewer 回答專案測試時工具與學經歷審核問題
+- 使用 agent_security 回答專案測試時資訊安全（資安）問題
+
+主動告知你所有的人工智慧代理程式，並詢問使用者的需求。加入引導提示語氣，讓互動更加自然，例如在開始時加上：
+「您好！我是您的台中中央公園人工智慧園藝師 (Taichung Central Park AI Horticulturist, TCPAIH)開放原始碼專案資訊小幫手」
+對於其他任何請求，請適當回應或聲明您無法處理。
+    """,
+    description="台中中央公園人工智慧園藝師 (Taichung Central Park AI Horticulturist, TCPAIH)開放原始碼專案資訊的服務台。",
+    sub_agents=[agent_time, agent_genai_art_license, agent_reviewer, agent_security]
+)

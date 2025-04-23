@@ -1,4 +1,30 @@
 services:
+
+  traefik:
+    image: "traefik:v3.3"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.websecure.address=:443"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    ports:
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./certs:/etc/certs:ro"
+      - "./traefik_dynamic:/etc/traefik/dynamic:ro"
+
+  whoami:
+    image: "traefik/whoami"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami-secure.rule=Host(`whoami.localtest.me`)"
+      - "traefik.http.routers.whoami-secure.entrypoints=websecure"
+      - "traefik.http.routers.whoami-secure.tls=true"
   ovs:
     build:
       context: .
@@ -6,3 +32,26 @@ services:
     ports:
       - "3000:3000"
       - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ovs-secure.rule=Host(`ovs.localtest.me`)"
+      - "traefik.http.routers.ovs-secure.entrypoints=websecure"
+      - "traefik.http.routers.ovs-secure.tls=true"
+      - "traefik.http.routers.ovs-secure.service=svc_ovs"
+      - "traefik.http.services.svc_ovs.loadbalancer.server.port=3000"
+      - "traefik.http.routers.adk-secure.rule=Host(`adk.localtest.me`)"
+      - "traefik.http.routers.adk-secure.entrypoints=websecure"
+      - "traefik.http.routers.adk-secure.tls=true"
+      - "traefik.http.routers.adk-secure.service=svc_adk"
+      - "traefik.http.services.svc_adk.loadbalancer.server.port=8000"
+      # Declaring the user list
+      #
+      # Note: when used in docker-compose.yml all dollar signs in the hash need to be doubled for escaping.
+      # To create a user:password pair, the following command can be used:
+      # echo $(htpasswd -nb user password) | sed -e s/\\$/\\$\\$/g
+      #
+      # Create a middleware named `ovs-auth` that uses basic authentication
+      - "traefik.http.middlewares.ovs-auth.basicauth.users=tcpaih:$$apr1$$pwekLeg/$$Wi3OV2O.CeVTSQRxRh7Cu."
+      # Apply the middleware named `ovs-auth` to the router named `ovs-secure` and `adk-secure`
+      - "traefik.http.routers.ovs-secure.middlewares=ovs-auth@docker"
+      - "traefik.http.routers.adk-secure.middlewares=ovs-auth@docker"

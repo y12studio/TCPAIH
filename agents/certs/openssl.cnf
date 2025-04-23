@@ -1,0 +1,24 @@
+[ req ]
+default_bits       = 2048
+default_keyfile    = key.pem
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+prompt             = no
+
+[ req_distinguished_name ]
+C                  = US
+ST                 = State
+L                  = Locality
+O                  = Organization
+OU                 = Organizational Unit
+CN                 = localhost
+
+[ req_ext ]
+subjectAltName     = @alt_names
+
+[alt_names]
+DNS.1   = localhost
+DNS.2   = *.localhost
+DNS.3   = *.sslip.io
+DNS.4   = *.nip.io
+DNS.5   = *.localtest.me
